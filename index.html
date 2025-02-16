@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title style="font-family: 'Times New Roman', Times, serif;">Voice Language Translator</title>
+    <style>
+        body {
+            text-align: center;
+            margin-top: 50px;
+            background:black; /* Colorful background gradient */
+            color: #fff;
+            position: relative;
+        }
+        h1 {
+            font-size: 36px;
+            margin-bottom: 20px;
+            color: #fff;
+        }
+
+        #start-button {
+            padding: 15px 30px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: teal;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 5px 10px rgba(0, 0, 0, 0.2);
+            transition: background-color 0.3s ease;
+        }
+
+        #start-button:hover {
+            background-color: navy;
+        }
+
+        #result {
+            margin-top: 20px;
+            font-size: 24px;
+            color: #fff;
+        }
+
+        #audio-player {
+            margin-top: 20px;
+        }
+
+        select {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: none;
+        }
+
+        /* Light watermark in the background */
+        .watermark {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 80px; /* Adjusted size */
+            font-weight: bold;
+            color: rgba(255, 255, 255, 0.2); /* Made slightly darker for visibility */
+            user-select: none; /* Prevent text selection */
+            pointer-events: none; /* Avoid interaction with the watermark */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Voice Language Translator</h1>
+
+    <!-- Dropdown for source language selection -->
+    <label for="src-lang">Select Source Language:</label>
+    <select id="src-lang">
+        <option value="en">English</option>
+        <option value="es">Spanish</option>
+        <option value="ta">Tamil</option>
+        <option value="te">Telugu</option>
+        <option value="bn">Bengali</option>
+        <option value="kn">Kannada</option>
+        <option value="gu">Gujarati</option>
+        <option value="hi">Hindi</option>
+    </select>
+
+    <!-- Dropdown for destination language selection -->
+    <label for="dest-lang">Select Destination Language:</label>
+    <select id="dest-lang">
+        <option value="hi">Hindi</option>
+        <option value="en">English</option>
+        <option value="es">Spanish</option>
+        <option value="te">Telugu</option>
+        <option value="ta">Tamil</option>
+        <option value="bn">Bengali</option>
+        <option value="gu">Gujarati</option>
+        <option value="ml">Malayalam</option>
+        <option value="zh-TW">Chinese</option>
+        <option value="ur">Urdu</option>
+    </select>
+
+    <button id="start-button">Start Speaking</button>
+    <div id="result"></div>
+    <audio id="audio-player" controls style="display:none;"></audio>
+
+    <!-- Watermark with the translator's name -->
+    <div class="watermark">My Translator</div>
+
+    <script>
+        document.getElementById('start-button').addEventListener('click', () => {
+            console.log('Start button clicked');  // Debug log
+            if (!('webkitSpeechRecognition' in window)) {
+                document.getElementById('result').innerText = 'Speech Recognition API not supported.';
+                return;
+            }
+    
+            const recognition = new webkitSpeechRecognition();
+            recognition.lang = document.getElementById('src-lang').value;  // Set input language from selection
+            recognition.interimResults = false; // Disable interim results
+            recognition.maxAlternatives = 1; // Only get the best alternative
+    
+            recognition.start();
+            console.log('Speech recognition started...');
+    
+            recognition.onresult = (event) => {
+                const speechResult = event.results[0][0].transcript;
+                console.log('Recognized text:', speechResult);
+    
+                const srcLang = document.getElementById('src-lang').value;
+                const destLang = document.getElementById('dest-lang').value;
+    
+                fetch('http://localhost:5000/translate', {  // Use full URL to Flask app
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ text: speechResult, src: srcLang, dest: destLang }),
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.translatedText) {
+                        document.getElementById('result').innerText = data.translatedText;
+    
+                        const audioPlayer = document.getElementById('audio-player');
+                        audioPlayer.src = `${data.audioUrl}?t=${new Date().getTime()}`;
+                        audioPlayer.style.display = 'block';
+                        audioPlayer.play();
+                    } else {
+                        document.getElementById('result').innerText = 'Error: ' + data.error;
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('result').innerText = 'Translation error: ' + error.message;
+                    console.error('Fetch error:', error);
+                });
+            };
+    
+            recognition.onerror = (event) => {
+                document.getElementById('result').innerText = 'Speech recognition error: ' + event.error;
+                console.error('Speech recognition error:', event.error);
+            };
+    
+            recognition.onend = () => {
+                console.log('Speech recognition has ended.');
+            };
+        });
+   </script>
+</body>
+</html>
